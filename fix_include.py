@@ -180,7 +180,7 @@ def show_help():
 	print('-h    - show this help info')
 	print('-q    - quiet mode')
 	print('-a    - automatic mode (don\'t prompt for input)')
-	print('WARNING: this script will permanently modify files in the base directory and sub directories. it is highly recommended that you back up your code before running it.')
+	print('WARNING: this script will permanently modify files in the specified directory and sub directories.\nit is highly recommended that you back up your code before running it.')
 
 def parse_args():
 	global base_path
@@ -197,16 +197,20 @@ def parse_args():
 			automatic = True
 		elif arg.startswith('-'):
 			print('invalid arg \'' + arg + '\'')
-			show_help()
+			print('(use -h for help)')
 			exit(-1)
 		else:
 			if base_path == None:
 				base_path = arg
 			else:
-				print('can not have multiple base paths')
+				print('can not have multiple root paths')
+				print('(use -h for help)')
 				exit(-1)
 	if base_path == None:
-		base_path = '.'
+		#base_path = '.'
+		print('please specify a root path')
+		print('(use -h for help)')
+		exit(-1)
 	base_path = os.path.abspath(base_path)
 	#if os.path.relpath(os.path.dirname(sys.argv[0])) == os.path.relpath(base_path):
 	#	global warn
