@@ -44,15 +44,39 @@ def get_header_dict(base):
 	return headers
 
 def get_path_from_user(file_path, include_path):
-	"get_path_from_user not yet implemented"
+	print('\nenter path to replace "' + include_path + '" in "' + file_path + '":')
+	print('(press enter to leave unchanged)')
+	val = input('path: ')
+	if val.strip() == '':
+		return include_path
+	else:
+		return val
 
 def get_choice_from_user(file_path, include_path, options):
-	return os.path.relpath(options[0], file_path)
+	print('\nselect path to replace "' + include_path + '" in "' + file_path + '":')
+	rel_options = [ os.path.relpath(i, file_path) for i in options]
+	print('1. [enter other]')
+	print('2. ' + include_path + ' (unchanged)')
+	for i in range(0, len(rel_options)):
+		print(str(i + 3) + '. ' + rel_options[i])
+	val = int(input('enter selection: ')) - 3
+	if val == -2:
+		return get_path_from_user(file_path, include_path)
+	elif val == -1:
+		return include_path
+	elif val >= 0 and val < len(rel_options):
+		return rel_options[val]
+	else:
+		print('invalid input')
+		return get_choice_from_user(file_path, include_path, options)
 
 def fix_include(file_path, include_path, headers):
 	name = split_ext(os.path.basename(include_path))[0]
 	if name in headers:
 		if type(headers[name]) == type([]):
+			for i in headers[name]:
+				if include_path == i:
+					return include_path
 			return get_choice_from_user(file_path, include_path, headers[name])
 		else:
 			return os.path.relpath(headers[name], file_path)
