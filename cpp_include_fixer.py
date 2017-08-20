@@ -53,14 +53,14 @@ def get_header_dict(base):
 	return headers
 
 def get_path_from_user(file_path, include_path):
-	print('\nenter path to replace "' + include_path + '" in "' + file_path + '":')
+	print('\nenter path to replace "' + include_path + '" in "' + os.path.relpath(file_path) + '":')
 	print('(press enter to leave unchanged)')
 	val = input('path: ')
 	if val.strip() == '':
 		print('leaving unchanged\n')
 		return None
 	else:
-		print('\n')
+		print('')
 		return val
 
 def get_any_header_from_user(file_path, include_path, headers):
@@ -73,15 +73,19 @@ def get_any_header_from_user(file_path, include_path, headers):
 	return get_choice_from_user(file_path, include_path, all_headers, headers)
 
 def get_choice_from_user(file_path, include_path, options, headers):
-	print('\nselect header to replace "' + include_path + '" in "' + file_path + '":')
+	print('\nselect header to replace "' + include_path + '" in "' + os.path.relpath(file_path) + '":')
 	rel_options = [ os.path.relpath(i, file_path) for i in options]
 	print('  0: ' + include_path + ' (unchanged)')
 	for i in range(0, len(rel_options)):
 		print('  ' + str(i + 1) + ': ' + rel_options[i])
 	print('  ' + str(len(rel_options) + 1) + ': [show all headers]')
 	print('  ' + str(len(rel_options) + 2) + ': [enter other]')
+	val = input('enter selection: ')
+	if val == 'q':
+		print('aborted')
+		exit(0)
 	try:
-		val = int(input('enter selection: ')) - 1
+		val = int(val) - 1
 	except ValueError:
 		print('leaving unchanged\n')
 		return None
@@ -91,7 +95,7 @@ def get_choice_from_user(file_path, include_path, options, headers):
 	elif val >= 0 and val < len(rel_options):
 		return rel_options[val]
 	elif val == len(rel_options):
-		get_any_header_from_user(file_path, include_path, headers)
+		return get_any_header_from_user(file_path, include_path, headers)
 	elif val == len(rel_options) + 1:
 		return get_path_from_user(file_path, include_path)
 	else:
@@ -108,8 +112,6 @@ def fix_include(file_path, include_path, headers):
 			return get_choice_from_user(file_path, include_path, headers[name], headers) if not automatic else None
 		else:
 			new = os.path.relpath(headers[name], os.path.dirname(file_path))
-			if new == include_path:
-				print('new: ' + new + ', include_path: ' + include_path)
 			return new if new != include_path else None
 	else:
 		new = get_any_header_from_user(file_path, include_path, headers) if not automatic else None
@@ -135,19 +137,41 @@ def fix_text(file_path, text, headers):
 def get_all_sources(base):
 	return get_all_files_with_extension(base, source_ext)
 
+def prompt_for_file(path):
+	print('\nsave changes to \'' + os.path.relpath(path) + '\'? (Yes, No, YYes to all, Quit)')
+	val = input('[Y/n/yy/q]: ').lower()
+	print('')
+	if val == '' or val == 'y' or val == 'yes':
+		return True
+	elif val == 'n' or val == 'no':
+		return False
+	elif val == 'yy' or val == 'yes to all':
+		global warn
+		warn = False
+		return True
+	elif val == 'q' or val == 'quit':
+		print('aborted')
+		exit(0)
+	else:
+		print('please enter y, n, a or q')
+		return prompt_for_file(path)
+
 def fix_file(path, headers):
 	if not quiet:
-		print('checking \'' + path + '\'')
+		print('checking \'' + os.path.relpath(path) + '\'')
 	f = open(path, 'r')
 	text = f.read()
 	f.close()
 	fixed_text = fix_text(path, text, headers)
 	if fixed_text != None:
-		if not quiet:
-			print('saving changes')
-		f = open(path, 'w')
-		f.write(fixed_text)
-		f.close()
+		if not warn or automatic or prompt_for_file(path):
+			if not quiet:
+				print('saving changes')
+			f = open(path, 'w')
+			f.write(fixed_text)
+			f.close()
+		elif not quiet:
+			print('changes not saved')
 
 def show_help():
 	print('Include Fixer - a tool for automatically fixing broken #includes in C and C++ code')
@@ -184,9 +208,19 @@ def parse_args():
 	if base_path == None:
 		base_path = '.'
 	base_path = os.path.abspath(base_path)
-	if os.path.relpath(os.path.dirname(sys.argv[0])) == os.path.relpath(base_path):
-		global warn
-		warn = False
+	#if os.path.relpath(os.path.dirname(sys.argv[0])) == os.path.relpath(base_path):
+	#	global warn
+	#	warn = False
+
+def warn_at_start():
+	if warn and not automatic:
+		print('WARNING: this script will permanently modify files in \'' + base_path + '\' and sub directories.\nit is highly recommended that you back up your code before running it.')
+		print('(this warning is disabled if this script is located in the project root)')
+		val = input('continue? [Y/n]: ')
+		if val != '' and val != 'Y' and val != 'y':
+			print('aborted')
+			exit(0)
+
 
 parse_args()
 
@@ -199,18 +233,11 @@ sources = get_all_sources(base_path)
 if not quiet:
 	print('found ' + str(len(headers)) + ' headers and ' + str(len(sources) - len(headers)) + ' implementation files')
 
-if warn and not automatic:
-	print('WARNING: this script will permanently modify files in \'' + base_path + '\' and sub directories.\nit is highly recommended that you back up your code before running it.')
-	print('(this warning is disabled if this script is located in the project root)')
-	val = input('continue? [Y/n]: ')
-	if val != '' and val != 'Y' and val != 'y':
-		print('aborted')
-		exit(0)
+# this is no longer needed because now it prompts for every file
+#warn_at_start()
 
 for i in get_all_sources(base_path):
 	fix_file(i, headers)
-
-print(headers)
 
 if not quiet:
 	print('task complete, exiting.')
