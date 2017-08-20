@@ -107,7 +107,9 @@ def fix_include(file_path, include_path, headers):
 					return None
 			return get_choice_from_user(file_path, include_path, headers[name], headers) if not automatic else None
 		else:
-			new = os.path.relpath(headers[name], file_path)
+			new = os.path.relpath(headers[name], os.path.dirname(file_path))
+			if new == include_path:
+				print('new: ' + new + ', include_path: ' + include_path)
 			return new if new != include_path else None
 	else:
 		new = get_any_header_from_user(file_path, include_path, headers) if not automatic else None
@@ -207,6 +209,8 @@ if warn and not automatic:
 
 for i in get_all_sources(base_path):
 	fix_file(i, headers)
+
+print(headers)
 
 if not quiet:
 	print('task complete, exiting.')
