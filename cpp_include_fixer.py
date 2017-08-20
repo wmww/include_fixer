@@ -105,12 +105,12 @@ def fix_include(file_path, include_path, headers):
 			for i in headers[name]:
 				if os.path.relpath(i, file_path) == include_path:
 					return None
-			return get_choice_from_user(file_path, include_path, headers[name], headers)
+			return get_choice_from_user(file_path, include_path, headers[name], headers) if not automatic else None
 		else:
 			new = os.path.relpath(headers[name], file_path)
 			return new if new != include_path else None
 	else:
-		new = get_any_header_from_user(file_path, include_path, headers)
+		new = get_any_header_from_user(file_path, include_path, headers) if not automatic else None
 		if new != None:
 			add_entry_to_headers(name, new, headers)
 		return new
@@ -123,6 +123,8 @@ def fix_text(file_path, text, headers):
 		fixed = fix_include(file_path, sections[i], headers)
 		if fixed != None:
 			fixed_something = True
+			if not quiet:
+				print('replacing \'' + sections[i] + '\' with \'' + fixed + '\'')
 			sections[i] = fixed
 		sections[i] = '#include "' + sections[i] + '"'
 		i += 2
@@ -132,11 +134,15 @@ def get_all_sources(base):
 	return get_all_files_with_extension(base, source_ext)
 
 def fix_file(path, headers):
+	if not quiet:
+		print('checking \'' + path + '\'')
 	f = open(path, 'r')
 	text = f.read()
 	f.close()
 	fixed_text = fix_text(path, text, headers)
 	if fixed_text != None:
+		if not quiet:
+			print('saving changes')
 		f = open(path, 'w')
 		f.write(fixed_text)
 		f.close()
@@ -151,18 +157,16 @@ def show_help():
 	print('WARNING: this script will permanently modify files in the base directory and sub directories. it is highly recommended that you back up your code before running it.')
 
 def parse_args():
-	if os.path.relpath(os.path.dirname(sys.argv[0])) == '.':
-		global warn
-		warn = False
+	global base_path
 	for i in range(1, len(sys.argv)):
 		arg = sys.argv[i]
 		if arg == '-h' or arg == '--help':
 			show_help()
 			exit(0)
-		elif arg == 'q':
+		elif arg == '-q':
 			global quiet
 			quiet = True
-		elif arg == 'a':
+		elif arg == '-a':
 			global automatic
 			automatic = True
 		elif arg.startswith('-'):
@@ -170,7 +174,6 @@ def parse_args():
 			show_help()
 			exit(-1)
 		else:
-			global base_path
 			if base_path == None:
 				base_path = arg
 			else:
@@ -178,10 +181,12 @@ def parse_args():
 				exit(-1)
 	if base_path == None:
 		base_path = '.'
+	base_path = os.path.abspath(base_path)
+	if os.path.relpath(os.path.dirname(sys.argv[0])) == os.path.relpath(base_path):
+		global warn
+		warn = False
 
 parse_args()
-
-base_path = os.path.abspath(base_path)
 
 if not quiet:
 	print('detecting files...')
@@ -192,14 +197,16 @@ sources = get_all_sources(base_path)
 if not quiet:
 	print('found ' + str(len(headers)) + ' headers and ' + str(len(sources) - len(headers)) + ' implementation files')
 
-if warn:
+if warn and not automatic:
 	print('WARNING: this script will permanently modify files in \'' + base_path + '\' and sub directories.\nit is highly recommended that you back up your code before running it.')
 	print('(this warning is disabled if this script is located in the project root)')
 	val = input('continue? [Y/n]: ')
-	if val != '' and val == 'Y' and val == 'y':
+	if val != '' and val != 'Y' and val != 'y':
 		print('aborted')
 		exit(0)
 
 for i in get_all_sources(base_path):
 	fix_file(i, headers)
 
+if not quiet:
+	print('task complete, exiting.')
