@@ -11,7 +11,7 @@ def split_ext(path):
 	return (i[0], i[1]) if len(i) == 2 else (i[0], '')
 
 def get_contents_of_dir(base):
-	return [ os.path.abspath(os.path.join(base, i)) for i in os.listdir(base) ]
+	return [ os.path.abspath(os.path.join(base, i)) for i in os.listdir(base) if not i.startswith('.') ]
 
 def get_subdirs(base):
 	return [ i for i in get_contents_of_dir(base) if os.path.isdir(i) ]
@@ -48,48 +48,73 @@ def get_path_from_user(file_path, include_path):
 	print('(press enter to leave unchanged)')
 	val = input('path: ')
 	if val.strip() == '':
-		return include_path
+		print('leaving unchanged\n')
+		return None
 	else:
+		print('\n')
 		return val
 
-def get_choice_from_user(file_path, include_path, options):
-	print('\nselect path to replace "' + include_path + '" in "' + file_path + '":')
+def get_any_header_from_user(file_path, include_path, headers):
+	all_headers = []
+	for key, val in headers.items():
+		if type(val) == type([]):
+			all_headers += val
+		else:
+			all_headers.append(val)
+	return get_choice_from_user(file_path, include_path, all_headers, headers)
+
+def get_choice_from_user(file_path, include_path, options, headers):
+	print('\nselect header to replace "' + include_path + '" in "' + file_path + '":')
 	rel_options = [ os.path.relpath(i, file_path) for i in options]
-	print('1. [enter other]')
-	print('2. ' + include_path + ' (unchanged)')
+	print('  0: ' + include_path + ' (unchanged)')
 	for i in range(0, len(rel_options)):
-		print(str(i + 3) + '. ' + rel_options[i])
-	val = int(input('enter selection: ')) - 3
-	if val == -2:
-		return get_path_from_user(file_path, include_path)
-	elif val == -1:
-		return include_path
+		print('  ' + str(i + 1) + ': ' + rel_options[i])
+	print('  ' + str(len(rel_options) + 1) + ': [show all headers]')
+	print('  ' + str(len(rel_options) + 2) + ': [enter other]')
+	try:
+		val = int(input('enter selection: ')) - 1
+	except ValueError:
+		print('leaving unchanged\n')
+		return None
+	print('')
+	if val == -1:
+		return None
 	elif val >= 0 and val < len(rel_options):
 		return rel_options[val]
+	elif val == len(rel_options):
+		get_any_header_from_user(file_path, include_path, headers)
+	elif val == len(rel_options) + 1:
+		return get_path_from_user(file_path, include_path)
 	else:
 		print('invalid input')
-		return get_choice_from_user(file_path, include_path, options)
+		return get_choice_from_user(file_path, include_path, options, headers)
 
 def fix_include(file_path, include_path, headers):
 	name = split_ext(os.path.basename(include_path))[0]
 	if name in headers:
 		if type(headers[name]) == type([]):
 			for i in headers[name]:
-				if include_path == i:
-					return include_path
-			return get_choice_from_user(file_path, include_path, headers[name])
+				if os.path.relpath(i, file_path) == include_path:
+					return None
+			return get_choice_from_user(file_path, include_path, headers[name], headers)
 		else:
-			return os.path.relpath(headers[name], file_path)
+			new = os.path.relpath(headers[name], file_path)
+			return new if new != include_path else None
 	else:
-		return get_path_from_user(file_path, include_path)
+		return get_any_header_from_user(file_path, include_path, headers)
 
 def fix_text(file_path, text, headers):
 	sections = re.split('#include[\s\t]*\"(.*)\"', text)
+	fixed_something = False
 	i = 1
 	while i < len(sections):
-		sections[i] = '#include "' + fix_include(file_path, sections[i], headers) + '"'
+		fixed = fix_include(file_path, sections[i], headers)
+		if fixed != None:
+			fixed_something = True
+			sections[i] = fixed
+		sections[i] = '#include "' + sections[i] + '"'
 		i += 2
-	return ''.join(sections)
+	return ''.join(sections) if fixed_something else None
 
 def get_all_sources(base):
 	return get_all_files_with_extension(base, source_ext)
@@ -99,9 +124,10 @@ def fix_file(path, headers):
 	text = f.read()
 	f.close()
 	fixed_text = fix_text(path, text, headers)
-	f = open(path, 'w')
-	f.write(fixed_text)
-	f.close()
+	if fixed_text != None:
+		f = open(path, 'w')
+		f.write(fixed_text)
+		f.close()
 
 base = 'dummy'
 
