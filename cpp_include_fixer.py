@@ -2,9 +2,15 @@
 
 import os
 import re
+import sys
 
 header_ext = ['h', 'hpp']
 source_ext = ['c', 'cpp', 'h', 'hpp']
+
+base_path = None
+quiet = False
+automatic = False
+warn = True
 
 def split_ext(path):
 	i = path.rsplit('.', 1)
@@ -31,16 +37,19 @@ def get_all_files(base):
 def get_all_files_with_extension(base, extensions):
 	return [ path for path in get_all_files(base) if has_extension(path, extensions) ]
 
+def add_entry_to_headers(name, path, headers):
+	if name in headers:
+		if type(headers[name]) != type([]):
+			headers[name] = [headers[name]]
+		headers[name].append(path)
+	else:
+		headers[name] = path
+
 def get_header_dict(base):
 	headers = {}
 	for path in get_all_files_with_extension(base, header_ext):
 		name = split_ext(os.path.basename(path))[0]
-		if name in headers:
-			if type(headers[name]) != type([]):
-				headers[name] = [headers[name]]
-			headers[name].append(path)
-		else:
-			headers[name] = path
+		add_entry_to_headers(name, path, headers)
 	return headers
 
 def get_path_from_user(file_path, include_path):
@@ -101,7 +110,10 @@ def fix_include(file_path, include_path, headers):
 			new = os.path.relpath(headers[name], file_path)
 			return new if new != include_path else None
 	else:
-		return get_any_header_from_user(file_path, include_path, headers)
+		new = get_any_header_from_user(file_path, include_path, headers)
+		if new != None:
+			add_entry_to_headers(name, new, headers)
+		return new
 
 def fix_text(file_path, text, headers):
 	sections = re.split('#include[\s\t]*\"(.*)\"', text)
@@ -129,15 +141,65 @@ def fix_file(path, headers):
 		f.write(fixed_text)
 		f.close()
 
-base = 'dummy'
+def show_help():
+	print('Include Fixer - a tool for automatically fixing broken #includes in C and C++ code')
+	print('usage: include_fixer [options] [root directory]')
+	print('options:')
+	print('-h    - show this help info')
+	print('-q    - quiet mode')
+	print('-a    - automatic mode (don\'t prompt for input)')
+	print('WARNING: this script will permanently modify files in the base directory and sub directories. it is highly recommended that you back up your code before running it.')
 
-headers = get_header_dict(base)
+def parse_args():
+	if os.path.relpath(os.path.dirname(sys.argv[0])) == '.':
+		global warn
+		warn = False
+	for i in range(1, len(sys.argv)):
+		arg = sys.argv[i]
+		if arg == '-h' or arg == '--help':
+			show_help()
+			exit(0)
+		elif arg == 'q':
+			global quiet
+			quiet = True
+		elif arg == 'a':
+			global automatic
+			automatic = True
+		elif arg.startswith('-'):
+			print('invalid arg \'' + arg + '\'')
+			show_help()
+			exit(-1)
+		else:
+			global base_path
+			if base_path == None:
+				base_path = arg
+			else:
+				print('can not have multiple base paths')
+				exit(-1)
+	if base_path == None:
+		base_path = '.'
 
-for i in get_all_sources(base):
+parse_args()
+
+base_path = os.path.abspath(base_path)
+
+if not quiet:
+	print('detecting files...')
+
+headers = get_header_dict(base_path)
+sources = get_all_sources(base_path)
+
+if not quiet:
+	print('found ' + str(len(headers)) + ' headers and ' + str(len(sources) - len(headers)) + ' implementation files')
+
+if warn:
+	print('WARNING: this script will permanently modify files in \'' + base_path + '\' and sub directories.\nit is highly recommended that you back up your code before running it.')
+	print('(this warning is disabled if this script is located in the project root)')
+	val = input('continue? [Y/n]: ')
+	if val != '' and val == 'Y' and val == 'y':
+		print('aborted')
+		exit(0)
+
+for i in get_all_sources(base_path):
 	fix_file(i, headers)
 
-#files = get_all_files_with_extension('dummy', ['h', 'hpp'])
-
-#print(files)
-
-#print(get_header_dict('dummy'))
