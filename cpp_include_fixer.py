@@ -1,39 +1,28 @@
+#! /bin/python3
+
 import os
 
-def get_contents_of_dir(base_path):
-	return [ os.path.join(base_path, i) for i in os.listdir(base_path) ]
+def get_contents_of_dir(base):
+	return [ os.path.join(base, i) for i in os.listdir(base) ]
 
-def get_subdirs(base_path):
-	contents_list = get_contents_of_dir(base_path)
-	output_list = []
-	for path in contents_list:
-		if os.path.isdir(path):
-			output_list.append(path)
-	return output_list
+def get_subdirs(base):
+	return [ i for i in get_contents_of_dir(base) if os.path.isdir(i) ]
 
-def get_subdirs_recursive(base_path):
-	first_level_subdirs = get_subdirs(base_path)
-	all_subdirs = [base_path]
-	for i in first_level_subdirs:
-		all_subdirs = all_subdirs + get_subdirs_recursive(i)
-	return all_subdirs
-
-def path_has_extension(path, extensions):
+def get_all_subdirs(base):
+	return [base] + [i for j in get_subdirs(base) for i in get_all_subdirs(j)]
+	
+def has_extension(base, extensions):
 	for extension in extensions:
-		if path.endswith('.' + extension):
+		if base.endswith(extension):
 			return True
 	return False
 
-def get_all_files_with_extension(base_path, extensions):
-	dirs = get_subdirs_recursive(base_path)
-	out_files = []
-	for directory in dirs:
-		contents = get_contents_of_dir(directory)
-		for i in contents:
-			if os.path.isfile(i) and path_has_extension(i, extensions):
-				out_files.append(i)
-	return out_files
-	
+def get_all_files(base):
+	return [ path for subdir in get_all_subdirs(base) for path in get_contents_of_dir(subdir) if os.path.isfile(path) ]
+
+def get_all_files_with_extension(base, extensions):
+	return [ path for path in get_all_files(base) if has_extension(path, extensions) ]
+
 files = get_all_files_with_extension('dummy', ['h', 'hpp'])
 
 print(files)
