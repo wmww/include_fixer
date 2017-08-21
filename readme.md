@@ -1,6 +1,6 @@
 # Include Fixer
 
-Include Fixer is a utility that automatically fixes broken relative #includes in C and C++ source and headers. It makes it easy to reorganize projects large and small without manually changing every relative #include. For example, 
+Include Fixer is a utility that automatically fixes broken #include paths in C and C++ source and headers. It makes it easy to reorganize projects large and small without manually changing every relative #include. For example, if you keep the name of a header the same, but move it to a different directory, Include Fixer will updated all source and header files that #include it. Even if you change the name, the script will let you select the new file from a list and then remember your decision for the rest of the files in your project.
 
 ## Usage
 ```
