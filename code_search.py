@@ -29,7 +29,7 @@ def get_all_subdirs(base):
 	
 def has_extension(base, extensions):
 	for extension in extensions:
-		if base.endswith(extension):
+		if base.endswith('.'+extension):
 			return True
 	return False
 
@@ -40,11 +40,14 @@ def get_all_files_with_extension(base, extensions):
 	return [ path for path in get_all_files(base) if has_extension(path, extensions) ]
 
 def is_expr_in_file(path, expr):
-	text = open(path).read()
-	if expr in text:
-		return True
-	else:
-		return False
+	try:
+		text = open(path).read()
+		if expr in text:
+			return True
+		else:
+			return False
+	except:
+		print('error reading ' + path)
 
 """
 def show_help():
@@ -89,7 +92,7 @@ def parse_args():
 # parse_args()
 
 if len(sys.argv) != 3:
-	print('needs 2 args, got ' + str(len(sys.argv[1]) - 1))
+	print('needs 2 args (base path and search term), got ' + str(len(sys.argv) - 1))
 	exit(-1)
 
 base_path = sys.argv[1]
